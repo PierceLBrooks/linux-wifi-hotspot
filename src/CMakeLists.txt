@@ -14,7 +14,7 @@ add_definitions(-DNO_QR=1)
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_CXX_STANDARD 11)
 
-add_executable(${PROJECT_NAME} ui/main.c ui/h_prop.c ui/h_prop.h ui/ui.c ui/ui.h ui/read_config.cpp ui/read_config.h ui/util.c ui/util.h ui/about_ui.c ui/about_ui.h)
+add_executable(${PROJECT_NAME} ui/main.c ui/h_prop.c ui/h_prop.h ui/ui.c ui/ui.h ui/read_config.cpp ui/read_config.h ui/util.c ui/util.h ui/about_ui.c ui/about_ui.h ui/mdns.c ui/mdns.h)
 
 target_link_libraries(${PROJECT_NAME} ${GTK_LIBRARIES} ${X11_LIBRARIES} ${AVAHI_LIBRARIES})
 

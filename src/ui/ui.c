@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <avahi-common/malloc.h>
 #include <avahi-common/error.h>
 
+#include "mdns.h"
 #include "h_prop.h"
 #include "ui.h"
 #include "read_config.h"
@@ -187,6 +188,8 @@ static void service_resolver_callback(
                    type,
                    domain);
 #endif
+
+            service_mdns(host_name, name, port, address, 1);
 
             free(t);
 
