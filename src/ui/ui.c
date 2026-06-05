@@ -34,6 +34,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <stdlib.h>
 #include <X11/Xlib.h>
 #include <regex.h>
+#include <avahi-client/client.h>
+#include <avahi-client/lookup.h>
+#include <avahi-common/simple-watch.h>
+#include <avahi-common/malloc.h>
+#include <avahi-common/error.h>
 
 #include "h_prop.h"
 #include "ui.h"
@@ -122,7 +127,6 @@ GtkStyleContext *context_label_input_error;
 GtkStyleContext *context_tv_mac_filter;
 GtkStyleContext *context_entry_gateway;
 
-
 const char** iface_list;
 const char** wifi_iface_list;
 gchar *accepted_macs;
@@ -131,6 +135,11 @@ int wifi_iface_list_length;
 char* running_info[3];
 guint pb_pulse_id;
 static ConfigValues configValues;
+
+AvahiSimplePoll *simple_poll = NULL;
+AvahiClient *browser_client = NULL;
+AvahiStringList *browsed_types = NULL;
+int browsing = 0;
 
 
 
@@ -143,6 +152,204 @@ static void *stopHp(void *) {
         g_thread_new("init_running",init_running_info,NULL);
     }
     return 0;
+}
+
+static void service_browser_callback(
+    AvahiServiceBrowser *b,
+    AvahiIfIndex interface,
+    AvahiProtocol protocol,
+    AvahiBrowserEvent event,
+    const char *name,
+    const char *type,
+    const char *domain,
+    AvahiLookupResultFlags flags,
+    void *userdata) {
+    switch (event) {
+        case AVAHI_BROWSER_NEW: {
+#if 0
+            if (find_service(interface, protocol, name, type, domain))
+                return;
+
+            add_service(c, interface, protocol, name, type, domain);
+
+            print_service_line(c, '+', interface, protocol, name, type, domain, 1);
+#endif
+            break;
+
+        }
+
+        case AVAHI_BROWSER_REMOVE: {
+#if 0
+            ServiceInfo *info;
+
+            if (!(info = find_service(interface, protocol, name, type, domain)))
+                return;
+
+            remove_service(c, info);
+
+            print_service_line(c, '-', interface, protocol, name, type, domain, 1);
+#endif
+            break;
+        }
+
+        case AVAHI_BROWSER_FAILURE:
+            fprintf(stderr, "service_browser failed.\n");
+            avahi_simple_poll_quit(simple_poll);
+            simple_poll = NULL;
+            break;
+
+        case AVAHI_BROWSER_CACHE_EXHAUSTED:
+            //n_cache_exhausted --;
+            //check_terminate(c);
+            break;
+
+        case AVAHI_BROWSER_ALL_FOR_NOW:
+            //n_all_for_now --;
+            //check_terminate(c);
+            break;
+    }
+}
+
+static void browse_service_type(const char *stype, const char *domain) {
+    AvahiServiceBrowser *b;
+    AvahiStringList *i;
+
+    if (!(b = avahi_service_browser_new(
+              browser_client,
+              AVAHI_IF_UNSPEC,
+              AVAHI_PROTO_UNSPEC,
+              stype,
+              domain,
+              0,
+              service_browser_callback,
+              NULL))) {
+        fprintf(stderr, "avahi_service_browser_new() failed.\n");
+        avahi_simple_poll_quit(simple_poll);
+        simple_poll = NULL;
+    }
+
+    browsed_types = avahi_string_list_add(browsed_types, stype);
+
+    //n_all_for_now++;
+    //n_cache_exhausted++;
+}
+
+static void service_type_browser_callback(
+    AvahiServiceTypeBrowser *b,
+    AvahiIfIndex interface,
+    AvahiProtocol protocol,
+    AvahiBrowserEvent event,
+    const char *type,
+    const char *domain,
+    AvahiLookupResultFlags flags,
+    void *userdata) {
+    switch (event) {
+        case AVAHI_BROWSER_NEW:
+            browse_service_type(type, domain);
+            break;
+
+        case AVAHI_BROWSER_REMOVE:
+            /* We're dirty and never remove the browser again */
+            break;
+
+        case AVAHI_BROWSER_FAILURE:
+            fprintf(stderr, "service_type_browser failed.\n");
+            avahi_simple_poll_quit(simple_poll);
+            simple_poll = NULL;
+            break;
+
+        case AVAHI_BROWSER_CACHE_EXHAUSTED:
+            //n_cache_exhausted --;
+            //check_terminate(c);
+            break;
+
+        case AVAHI_BROWSER_ALL_FOR_NOW:
+            //n_all_for_now --;
+            //check_terminate(c);
+            break;
+    }
+}
+
+static int start_browsing() {
+    AvahiServiceTypeBrowser *b;
+    if (browser_client == NULL) {
+        return -1;
+    }
+    if (!(b = avahi_service_type_browser_new(
+              browser_client,
+              AVAHI_IF_UNSPEC,
+              AVAHI_PROTO_UNSPEC,
+              NULL,
+              0,
+              service_type_browser_callback,
+              NULL))) {
+        fprintf(stderr, "avahi_service_type_browser_new() failed.\n");
+        avahi_simple_poll_quit(simple_poll);
+        simple_poll = NULL;
+        return -2;
+    }
+    return 0;
+}
+
+static void browser_client_callback(AvahiClient *c, AvahiClientState state, void * userdata) {
+    /* This function might be called when avahi_client_new() has not
+     * returned yet.*/
+    browser_client = c;
+
+    switch (state) {
+        case AVAHI_CLIENT_FAILURE:
+
+            if (avahi_client_errno(c) == AVAHI_ERR_DISCONNECTED) {
+                int error;
+
+                /* We have been disconnected, so let reconnect */
+
+                fprintf(stderr, "Disconnected, reconnecting ...\n");
+
+                /*while (services)
+                    remove_service(config, services);*/
+
+                avahi_client_free(browser_client);
+                browser_client = NULL;
+
+                avahi_string_list_free(browsed_types);
+                browsed_types = NULL;
+
+                browsing = 0;
+
+                if (!(browser_client = avahi_client_new(avahi_simple_poll_get(simple_poll), AVAHI_CLIENT_NO_FAIL, browser_client_callback, NULL, NULL))) {
+                    fprintf(stderr, "Failed to recreate client object.\n");
+                    avahi_simple_poll_quit(simple_poll);
+                    simple_poll = NULL;
+                }
+
+            } else {
+                fprintf(stderr, "Client failure, exiting.\n");
+                avahi_simple_poll_quit(simple_poll);
+                simple_poll = NULL;
+            }
+
+            break;
+
+        case AVAHI_CLIENT_S_REGISTERING:
+        case AVAHI_CLIENT_S_RUNNING:
+        case AVAHI_CLIENT_S_COLLISION:
+
+            if (!browsing) {
+                if (start_browsing() < 0) {
+                    avahi_simple_poll_quit(simple_poll);
+                    simple_poll = NULL;
+                }
+            }
+
+            break;
+
+        case AVAHI_CLIENT_CONNECTING:
+
+            fprintf(stderr, "Waiting for daemon ...\n");
+
+            break;
+    }
 }
 
 static void on_create_hp_clicked(GtkWidget *widget, gpointer data) {
@@ -495,6 +702,18 @@ int initUi(int argc, char *argv[]){
 
     init_interface_list();
     init_ui_from_config();
+
+    if (!(simple_poll = avahi_simple_poll_new())) {
+        fprintf(stderr, "Failed to create simple poll object.\n");
+        return -1;
+    }
+
+    if (!(browser_client = avahi_client_new(avahi_simple_poll_get(simple_poll), AVAHI_CLIENT_NO_FAIL, browser_client_callback, NULL, NULL))) {
+        fprintf(stderr, "Failed to create client object.\n");
+        return -2;
+    }
+
+    avahi_simple_poll_loop(simple_poll);
 
 
     gtk_main();
