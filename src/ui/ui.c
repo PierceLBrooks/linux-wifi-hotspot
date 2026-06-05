@@ -713,8 +713,7 @@ int initUi(int argc, char *argv[]){
         return -2;
     }
 
-    avahi_simple_poll_loop(simple_poll);
-
+    g_thread_new("avahi_looper",avahi_looper_async,NULL);
 
     gtk_main();
 
@@ -961,6 +960,11 @@ void* init_running_info(void *){
     }
 
     stop_pb_pulse();
+    return 0;
+}
+
+void* avahi_looper_async(void *){
+    if (simple_poll) avahi_simple_poll_loop(simple_poll);
     return 0;
 }
 

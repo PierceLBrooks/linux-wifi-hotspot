@@ -50,6 +50,8 @@ void init_interface_list();
 
 void* init_running_info(void *);
 
+void* avahi_looper_async(void *);
+
 static gboolean update_progress_in_timeout (gpointer pbar);
 
 void lock_all_views(gboolean set_lock);
