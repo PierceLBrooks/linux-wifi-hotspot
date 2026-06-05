@@ -28,6 +28,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
  */
+#include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -482,15 +483,16 @@ Node get_connected_devices(char *PID)
     snprintf(cmd, BUFSIZE, "%s %s --list-clients %s", SUDO, CREATE_AP, PID);
     FILE *fp;
     Node l = (struct Device *)malloc(sizeof(struct Device));
+    memset(l, '\0', sizeof(struct Device));
     Position head = l;
     fp = popen(cmd, "r");
     char line[BUFSIZE];
 
     int _n = 0; //Device number
+    l->Number = _n;
     while (fgets(line, BUFSIZE, fp) != NULL)
     {
-        if (strstr(line, "MAC") != NULL)
-            continue;
+        if (strstr(line, "MAC") != NULL) continue;
 
         _n++;
         int size = strlen(line);
@@ -513,6 +515,7 @@ Node get_connected_devices(char *PID)
             }
         }
         l = add_device_node(l, _n, line, marker);
+        if (l == NULL) break;
     }
     return head;
 }
@@ -520,10 +523,16 @@ Node get_connected_devices(char *PID)
 PtrToNode add_device_node(PtrToNode l, int number, char line[BUFSIZE], int marker[3])
 {
     Node next = (PtrToNode)malloc(sizeof(struct Device));
+    memset(next, '\0', sizeof(struct Device));
     strcpy(next->MAC, line);
     strcpy(next->IP, line + marker[1]);
     strcpy(next->HOSTNAME, line + marker[2]);
     next->Number = number;
+    if (strlen(next->IP) == 0 || !isdigit(next->IP[0]))
+    {
+        free(next);
+        return NULL;
+    }
     next->Next = NULL;
     l->Next = next;
     return next;
