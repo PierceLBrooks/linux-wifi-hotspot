@@ -1,7 +1,11 @@
 build
+install
+src/build
+src/install
 .idea
 .vscode
 src/cmake-build-debug
+src/cmake-build-release
 src/ui/resources.c
 wifih.ui~
 about.glade~

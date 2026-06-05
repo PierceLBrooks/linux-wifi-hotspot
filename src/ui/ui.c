@@ -40,7 +40,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "read_config.h"
 #include "util.h"
 #include "about_ui.h"
+#if !NO_QR
 #include "qr_ui.h"
+#endif
 
 #define BUFSIZE 512
 #define AP_ENABLED "AP-ENABLED"
@@ -69,7 +71,8 @@ GtkWidget *label_cd_hostname;
 GtkWidget *label_cd_ip;
 GtkWidget *label_cd_mac;
 GtkWidget *label_cd_number;
-PtrToNode device_list;
+GMutex device_list_mutex;
+PtrToNode device_list = NULL;
 
 GtkEntry *entry_ssd;
 GtkEntry *entry_pass;
@@ -174,9 +177,10 @@ static void on_about_open_click(GtkWidget *widget, gpointer data){
 }
 
 static void on_qr_open_click(GtkWidget *widget, gpointer data){
-
+#if !NO_QR
     char* image_path = generate_qr_image(configValues.ssid,"WPA",configValues.pass);
     open_qr(widget,data,image_path);
+#endif
 }
 
 
@@ -415,6 +419,7 @@ int initUi(int argc, char *argv[]){
     button_refresh = (GtkButton *)gtk_builder_get_object(builder, "button_refresh");
 
     grid_devices = (GtkGrid *)gtk_builder_get_object(builder, "grid_devices");
+    g_mutex_init(&device_list_mutex);
 
     entry_ssd = (GtkEntry *) gtk_builder_get_object(builder, "entry_ssid");
     entry_pass = (GtkEntry *) gtk_builder_get_object(builder, "entry_pass");
@@ -992,7 +997,7 @@ gchar* get_accepted_macs(){
 /**
  * Clear device list
 */
-static void clear_connecetd_devices_list(){
+static void clear_connected_devices_list(){
 
     // Remove all the children widgets
     GList *children, *iter;
@@ -1011,28 +1016,44 @@ static void clear_connecetd_devices_list(){
 */
 static void set_connected_devices_label()
 {
-    Position tmp;
-    device_list = get_connected_devices(running_info[0]); // running_info[0] PID
+    Position temp;
+    Position next;
+    Position orig;
+    g_mutex_lock(&device_list_mutex);
+    orig = device_list;
+    device_list = NULL;
+    g_mutex_unlock(&device_list_mutex);
+    temp = get_connected_devices(running_info[0]); // running_info[0] PID
 
-    clear_connecetd_devices_list();
+    clear_connected_devices_list();
 
-    while (device_list->Next != NULL)
+    next = temp;
+    while (next != NULL && next->Next != NULL && next->Next->Number < 100)
     {
-        tmp = device_list; // Save the last one
-        device_list = device_list->Next;
         char number[2];
-        sprintf(number, "%d", device_list->Number);
+        sprintf(number, "%d", next->Next->Number);
         label_cd_number = gtk_label_new(number);
-        label_cd_hostname = gtk_label_new(device_list->HOSTNAME);
-        label_cd_ip = gtk_label_new(device_list->IP);
-        label_cd_mac = gtk_label_new(device_list->MAC);
+        label_cd_hostname = gtk_label_new(next->Next->HOSTNAME);
+        label_cd_ip = gtk_label_new(next->Next->IP);
+        label_cd_mac = gtk_label_new(next->Next->MAC);
 
-        gtk_grid_attach(grid_devices, label_cd_number, 0, device_list->Number, 1, 1);
-        gtk_grid_attach(grid_devices, label_cd_hostname, 1, device_list->Number, 1, 1);
-        gtk_grid_attach(grid_devices, label_cd_ip, 2, device_list->Number, 1, 1);
-        gtk_grid_attach(grid_devices, label_cd_mac, 3, device_list->Number, 1, 1);
+        gtk_grid_attach(grid_devices, label_cd_number, 0, next->Next->Number, 1, 1);
+        gtk_grid_attach(grid_devices, label_cd_hostname, 1, next->Next->Number, 1, 1);
+        gtk_grid_attach(grid_devices, label_cd_ip, 2, next->Next->Number, 1, 1);
+        gtk_grid_attach(grid_devices, label_cd_mac, 3, next->Next->Number, 1, 1);
         gtk_widget_show_all((GtkWidget *)grid_devices);
-        free(tmp); // Free the last pointer
+        next = next->Next;
+    }
+
+    g_mutex_lock(&device_list_mutex);
+    device_list = temp;
+    g_mutex_unlock(&device_list_mutex);
+
+    while (orig != NULL)
+    {
+        next = orig->Next;
+        free(orig);
+        orig = next;
     }
 }
 
@@ -1046,7 +1067,7 @@ static void on_refresh_clicked(GtkWidget *widget, gpointer data)
         set_connected_devices_label();
     }
     else {
-        clear_connecetd_devices_list();
+        clear_connected_devices_list();
     }
 }
 

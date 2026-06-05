@@ -35,7 +35,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "h_prop.h"
 #include "read_config.h"
+#if !NO_QR
 #include "qrgen.h"
+#endif
 
 
 #define BUFSIZE 2048
@@ -63,7 +65,7 @@ static char accepted_macs[BUFSIZE];
 static const char* g_ssid=NULL;
 static const char* g_pass=NULL;
 
-static char* qr_image_path;
+static char* qr_image_path=NULL;
 
 //config_t cfg;
 
@@ -437,6 +439,9 @@ char** get_wifi_interface_list(int *length){
 }
 
 char* generate_qr_image(char* ssid,char* type,char *password){
+#if NO_QR
+    return NULL;
+#else
     char cmd[BUFSIZE];
 
     qr_image_path = "/tmp/wihotspot_qr.png";
@@ -468,6 +473,7 @@ char* generate_qr_image(char* ssid,char* type,char *password){
     qr_to_png(cmd,qr_image_path);
     
     return qr_image_path;
+#endif
 }
 
 Node get_connected_devices(char *PID)

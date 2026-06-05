@@ -110,11 +110,12 @@ install it using your distro's package manager_
 * libgtk-3-dev
 * libqrencode-dev (for qr code generation)
 * libpng-dev (for qr code generation)
+* libavahi-client-dev
 
 On Ubuntu or Debian install dependencies by,
 
 ```bash
-sudo apt install -y libgtk-3-dev build-essential gcc g++ pkg-config make hostapd libqrencode-dev libpng-dev
+sudo apt install -y libgtk-3-dev build-essential gcc g++ pkg-config make hostapd libqrencode-dev libpng-dev libavahi-client-dev
 ```
 
 On Fedora/CentOS/Red Hat Enterprise Linux/Rocky Linux/Oracle Linux

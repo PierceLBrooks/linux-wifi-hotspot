@@ -4,15 +4,19 @@ project(wihotspot-gui)
 include(FindPkgConfig)
 pkg_check_modules(GTK gtk+-3.0 REQUIRED)
 pkg_check_modules(X11 x11 REQUIRED)
+pkg_check_modules(AVAHI avahi-client REQUIRED)
 include_directories(${GTK_INCLUDE_DIRS})
 include_directories(${X11_INCLUDE_DIRS})
+include_directories(${AVAHI_INCLUDE_DIRS})
 
-set(CMAKE_C_STANDARD 99)
+add_definitions(-DNO_QR=1)
+
+set (CMAKE_C_STANDARD 99)
 set (CMAKE_CXX_STANDARD 11)
 
-add_executable(wihotspot-gui ui/main.c ui/h_prop.c ui/h_prop.h ui/ui.c ui/ui.h ui/read_config.cpp ui/read_config.h ui/util.c ui/util.h)
+add_executable(${PROJECT_NAME} ui/main.c ui/h_prop.c ui/h_prop.h ui/ui.c ui/ui.h ui/read_config.cpp ui/read_config.h ui/util.c ui/util.h ui/about_ui.c ui/about_ui.h)
 
-target_link_libraries(${PROJECT_NAME} ${GTK_LIBRARIES} ${X11_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${GTK_LIBRARIES} ${X11_LIBRARIES} ${AVAHI_LIBRARIES})
 
 include_directories(/usr/include)
 
@@ -29,33 +33,39 @@ add_custom_command(
 set (appdir "/usr/share")
 set (appbin "/usr/bin")
 
+if (EXISTS "$ENV{DESTDIR}" AND NOT EXISTS "${CMAKE_INSTALL_PREFIX}")
+    set (CMAKE_INSTALL_PREFIX "$ENV{DESTDIR}")
+endif()
+
 add_custom_target(install_build
+        COMMAND mkdir -p ${CMAKE_INSTALL_PREFIX}${appdir}/${PROJECT_NAME}
+        COMMAND mkdir -p ${CMAKE_INSTALL_PREFIX}${appdir}/${PROJECT_NAME}/glade
+        COMMAND install -Dm755 ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME} ${CMAKE_INSTALL_PREFIX}${appdir}/${PROJECT_NAME}/${PROJECT_NAME}
+        COMMAND install -Dm755 ${CMAKE_CURRENT_BINARY_DIR}/glade/* ${CMAKE_INSTALL_PREFIX}${appdir}/${PROJECT_NAME}/glade/
+        COMMAND ln -rs ${CMAKE_INSTALL_PREFIX}${appdir}/${PROJECT_NAME}/${PROJECT_NAME} ${CMAKE_INSTALL_PREFIX}${appbin}/${PROJECT_NAME}
 
-        COMMAND mkdir -p $ENV{DESTDIR}${appdir}/${PROJECT_NAME}
-        COMMAND mkdir -p $ENV{DESTDIR}${appdir}/${PROJECT_NAME}/glade
-        COMMAND install -Dm755 ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME} $ENV{DESTDIR}${appdir}/${PROJECT_NAME}/${PROJECT_NAME}
-        COMMAND install -Dm755 ${CMAKE_CURRENT_BINARY_DIR}/glade/* $ENV{DESTDIR}${appdir}/${PROJECT_NAME}/glade/
-        COMMAND ln -rs $ENV{DESTDIR}${appdir}/${PROJECT_NAME}/${PROJECT_NAME} $ENV{DESTDIR}${appbin}/${PROJECT_NAME}
-
-        COMMAND install -Dm644 ${CMAKE_SOURCE_DIR}/desktop/hotspot.png $ENV{DESTDIR}${appdir}/${PROJECT_NAME}/hotspot.png
-        COMMAND install -Dm644 ${CMAKE_SOURCE_DIR}/desktop/wifihotspot.desktop $ENV{DESTDIR}${appdir}/${PROJECT_NAME}/${PROJECT_NAME}.desktop
-        COMMAND install -Dm644 ${CMAKE_SOURCE_DIR}/desktop/wifihotspot.desktop $ENV{DESTDIR}${appdir}/applications/${PROJECT_NAME}.desktop
+        COMMAND install -Dm644 ${CMAKE_SOURCE_DIR}/desktop/hotspot.png ${CMAKE_INSTALL_PREFIX}${appdir}/${PROJECT_NAME}/hotspot.png
+        COMMAND install -Dm644 ${CMAKE_SOURCE_DIR}/desktop/wifihotspot.desktop ${CMAKE_INSTALL_PREFIX}${appdir}/${PROJECT_NAME}/${PROJECT_NAME}.desktop
+        COMMAND install -Dm644 ${CMAKE_SOURCE_DIR}/desktop/wifihotspot.desktop ${CMAKE_INSTALL_PREFIX}${appdir}/applications/${PROJECT_NAME}.desktop
         DEPENDS ${PROJECT_NAME}
         COMMENT Installing files...
 
         COMMENT Remove old files if exist
-        COMMAND rm -rf $ENV{DESTDIR}${appdir}/wihotspot
-        COMMAND rm -f $ENV{DESTDIR}${appdir}/applications/wihotspot.desktop
+        COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}${appdir}/wihotspot
+        COMMAND rm -f ${CMAKE_INSTALL_PREFIX}${appdir}/applications/wihotspot.desktop
         )
 
 add_custom_target(uninstall_build
-        COMMAND rm -rf $ENV{DESTDIR}${appdir}/${PROJECT_NAME}
-        COMMAND rm -f $ENV{DESTDIR}${appbin}/${PROJECT_NAME}
-        COMMAND rm -f $ENV{DESTDIR}${appdir}/applications/${PROJECT_NAME}.desktop
-        COMMAND rm -rf $ENV{DESTDIR}${appdir}/${PROJECT_NAME}
+        COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}${appdir}/${PROJECT_NAME}
+        COMMAND rm -f ${CMAKE_INSTALL_PREFIX}${appbin}/${PROJECT_NAME}
+        COMMAND rm -f ${CMAKE_INSTALL_PREFIX}${appdir}/applications/${PROJECT_NAME}.desktop
+        COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}${appdir}/${PROJECT_NAME}
         COMMENT Uninstalling files...
 
         COMMENT Remove old files if exist
-        COMMAND rm -rf $ENV{DESTDIR}${appdir}/wihotspot
-        COMMAND rm -f $ENV{DESTDIR}${appdir}/applications/wihotspot.desktop
+        COMMAND rm -rf ${CMAKE_INSTALL_PREFIX}${appdir}/wihotspot
+        COMMAND rm -f ${CMAKE_INSTALL_PREFIX}${appdir}/applications/wihotspot.desktop
         )
+
+install(TARGETS ${PROJECT_NAME})
+

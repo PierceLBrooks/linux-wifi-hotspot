@@ -1,8 +1,8 @@
 CC=gcc
 PKGCONFIG = $(shell which pkg-config)
 
-CFLAGS=`pkg-config --cflags gtk+-3.0`
-LIBS=`pkg-config --libs gtk+-3.0 --libs x11` -lstdc++ -lpng -lqrencode
+CFLAGS=`pkg-config --cflags gtk+-3.0` -DNO_QR=0
+LIBS=`pkg-config --libs gtk+-3.0 --libs x11 --libs avahi-client` -lstdc++ -lpng -lqrencode
 
 APP_NAME="wihotspot"
 APP_GUI_BINARY="wihotspot-gui"
