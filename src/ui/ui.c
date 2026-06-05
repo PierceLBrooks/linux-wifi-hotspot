@@ -154,6 +154,56 @@ static void *stopHp(void *) {
     return 0;
 }
 
+static void service_resolver_callback(
+    AvahiServiceResolver *r,
+    AvahiIfIndex interface,
+    AvahiProtocol protocol,
+    AvahiResolverEvent event,
+    const char *name,
+    const char *type,
+    const char *domain,
+    const char *host_name,
+    const AvahiAddress *a,
+    uint16_t port,
+    AvahiStringList *txt,
+    AvahiLookupResultFlags flags,
+    void *userdata) {
+    switch (event) {
+        case AVAHI_RESOLVER_FOUND: {
+            char address[4096];
+            char *t;
+
+            avahi_address_snprint(address, sizeof(address), a);
+
+            t = avahi_string_list_to_string(txt);
+
+#if 1
+            printf(";%s;%s;%u;%s;%s;%s;%s\n",
+                   host_name,
+                   address,
+                   port,
+                   t,
+                   name,
+                   type,
+                   domain);
+#endif
+
+            free(t);
+
+            break;
+        }
+
+        case AVAHI_RESOLVER_FAILURE:
+            fprintf(stderr, "Failed to resolve service '%s' of type '%s' in domain '%s'.\n", name, type, domain);
+            break;
+    }
+
+
+    avahi_service_resolver_free(r);
+
+    //fflush(stdout);
+}
+
 static void service_browser_callback(
     AvahiServiceBrowser *b,
     AvahiIfIndex interface,
@@ -165,32 +215,18 @@ static void service_browser_callback(
     AvahiLookupResultFlags flags,
     void *userdata) {
     switch (event) {
-        case AVAHI_BROWSER_NEW: {
-#if 0
-            if (find_service(interface, protocol, name, type, domain))
-                return;
-
-            add_service(c, interface, protocol, name, type, domain);
-
-            print_service_line(c, '+', interface, protocol, name, type, domain, 1);
-#endif
+        case AVAHI_BROWSER_NEW:
+            if (running_info[0]!=NULL) {
+                AvahiServiceResolver *resolver;
+                if (!(resolver = avahi_service_resolver_new(browser_client, interface, protocol, name, type, domain, AVAHI_PROTO_UNSPEC, 0, service_resolver_callback, NULL))) {
+                    fprintf(stderr, "Failed to resolve service '%s' of type '%s' in domain '%s'.\n", name, type, domain);
+                    return;
+                }
+            }
             break;
 
-        }
-
-        case AVAHI_BROWSER_REMOVE: {
-#if 0
-            ServiceInfo *info;
-
-            if (!(info = find_service(interface, protocol, name, type, domain)))
-                return;
-
-            remove_service(c, info);
-
-            print_service_line(c, '-', interface, protocol, name, type, domain, 1);
-#endif
+        case AVAHI_BROWSER_REMOVE:
             break;
-        }
 
         case AVAHI_BROWSER_FAILURE:
             fprintf(stderr, "service_browser failed.\n");
@@ -288,6 +324,7 @@ static int start_browsing() {
         simple_poll = NULL;
         return -2;
     }
+    browsing = 1;
     return 0;
 }
 
