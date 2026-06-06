@@ -1018,7 +1018,7 @@ service_mdns(const char* hostname, const char* service_name, int service_port, c
 				if (mdns_announce_unicast(sockets[isock], buffer, capacity, service.record_ptr, 0, 0,
 				                        additional, additional_count, peer) < 0)
 					printf("Announcement failure: %s\n", strerror(errno));
-			sleep(1);
+			if (loops < -1) sleep(1);
 			continue;
 		}
 		int nfds = 0;
