@@ -193,11 +193,11 @@ static void service_resolver_callback(
             Position next = device_list;
             while (next != NULL && next->Next != NULL)
             {
+                if (!strcmp(next->Next->IP, address)) continue;
                 service_mdns(host_name, name, port, address, next->Next->IP, 1);
                 next = next->Next;
             }
             g_mutex_unlock(&device_list_mutex);
-            
 
             free(t);
 
