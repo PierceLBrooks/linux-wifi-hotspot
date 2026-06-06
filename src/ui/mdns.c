@@ -705,7 +705,7 @@ open_service_sockets(int* sockets, int max_sockets, const char* peer) {
 		}
 	}
 
-	if (num_sockets < max_sockets) {
+	if (num_sockets < max_sockets && peer == NULL) {
 		struct sockaddr_in6 sock_addr;
 		memset(&sock_addr, 0, sizeof(struct sockaddr_in6));
 		sock_addr.sin6_family = AF_INET6;
@@ -864,7 +864,7 @@ send_mdns_query(mdns_query_t* query, size_t count) {
 
 // Provide a mDNS service, answering incoming DNS-SD and mDNS queries
 int
-service_mdns(const char* hostname, const char* service_name, int service_port, const char* peer, int loops) {
+service_mdns(const char* hostname, const char* service_name, int service_port, const char* service_host, const char* peer, int loops) {
 	int sockets[32];
 	int num_sockets = open_service_sockets(sockets, sizeof(sockets) / sizeof(sockets[0]), peer);
 	if (num_sockets <= 0) {
@@ -914,7 +914,20 @@ service_mdns(const char* hostname, const char* service_name, int service_port, c
 	service.hostname = hostname_string;
 	service.service_instance = service_instance_string;
 	service.hostname_qualified = hostname_qualified_string;
-	service.address_ipv4 = service_address_ipv4;
+
+	if (service_host == NULL) {
+		service.address_ipv4 = service_address_ipv4;
+	} else {
+		struct sockaddr_in sock_addr;
+		memset(&sock_addr, 0, sizeof(struct sockaddr_in));
+		sock_addr.sin_family = AF_INET;
+		if (inet_aton(service_host, &sock_addr.sin_addr) == 0) return -1;
+		sock_addr.sin_port = htons(MDNS_PORT);
+#ifdef __APPLE__
+		sock_addr.sin_len = sizeof(struct sockaddr_in);
+#endif
+		service.address_ipv4 = sock_addr;
+	}
 	service.address_ipv6 = service_address_ipv6;
 	service.port = service_port;
 
@@ -946,7 +959,7 @@ service_mdns(const char* hostname, const char* service_name, int service_port, c
 	                                   .rclass = 0,
 	                                   .ttl = 0};
 
-	service.record_aaaa = (mdns_record_t){.name = service.hostname_qualified,
+	if (service_host == NULL) service.record_aaaa = (mdns_record_t){.name = service.hostname_qualified,
 	                                      .type = MDNS_RECORDTYPE_AAAA,
 	                                      .data.aaaa.addr = service.address_ipv6,
 	                                      .rclass = 0,
@@ -975,7 +988,7 @@ service_mdns(const char* hostname, const char* service_name, int service_port, c
 		additional[additional_count++] = service.record_srv;
 		if (service.address_ipv4.sin_family == AF_INET)
 			additional[additional_count++] = service.record_a;
-		if (service.address_ipv6.sin6_family == AF_INET6)
+		if (service_host == NULL && service.address_ipv6.sin6_family == AF_INET6)
 			additional[additional_count++] = service.record_aaaa;
 		additional[additional_count++] = service.txt_record[0];
 		additional[additional_count++] = service.txt_record[1];
@@ -996,7 +1009,7 @@ service_mdns(const char* hostname, const char* service_name, int service_port, c
 			additional[additional_count++] = service.record_srv;
 			if (service.address_ipv4.sin_family == AF_INET)
 				additional[additional_count++] = service.record_a;
-			if (service.address_ipv6.sin6_family == AF_INET6)
+			if (service_host == NULL && service.address_ipv6.sin6_family == AF_INET6)
 				additional[additional_count++] = service.record_aaaa;
 			additional[additional_count++] = service.txt_record[0];
 			additional[additional_count++] = service.txt_record[1];
@@ -1042,7 +1055,7 @@ service_mdns(const char* hostname, const char* service_name, int service_port, c
 		additional[additional_count++] = service.record_srv;
 		if (service.address_ipv4.sin_family == AF_INET)
 			additional[additional_count++] = service.record_a;
-		if (service.address_ipv6.sin6_family == AF_INET6)
+		if (service_host == NULL && service.address_ipv6.sin6_family == AF_INET6)
 			additional[additional_count++] = service.record_aaaa;
 		additional[additional_count++] = service.txt_record[0];
 		additional[additional_count++] = service.txt_record[1];

@@ -189,7 +189,15 @@ static void service_resolver_callback(
                    domain);
 #endif
 
-            service_mdns(host_name, name, port, address, 1);
+            g_mutex_lock(&device_list_mutex);
+            Position next = device_list;
+            while (next != NULL && next->Next != NULL)
+            {
+                service_mdns(host_name, name, port, address, next->Next->IP, 1);
+                next = next->Next;
+            }
+            g_mutex_unlock(&device_list_mutex);
+            
 
             free(t);
 

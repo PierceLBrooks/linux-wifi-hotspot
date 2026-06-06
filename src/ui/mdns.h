@@ -178,7 +178,7 @@ struct mdns_query_t {
 // mDNS/DNS-SD public API
 
 int
-service_mdns(const char* hostname, const char* service_name, int service_port, const char* peer, int loops);
+service_mdns(const char* hostname, const char* service_name, int service_port, const char* service_host, const char* peer, int loops);
 
 //! Open and setup a IPv4 socket for mDNS/DNS-SD. To bind the socket to a specific interface, pass
 //! in the appropriate socket address in saddr, otherwise pass a null pointer for INADDR_ANY. To
